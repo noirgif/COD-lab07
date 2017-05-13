@@ -1,0 +1,173 @@
+`timescale 1ns/1ps
+module main(
+    input clk,
+    input rst_n
+);
+
+wire [31:0] MemRead,Instr, PC, ALUResult, WriteData, Data, RD1, RD2, SrcA, SrcB, SigImm, Result, ALUOut, PCJump, Addr,PCp;
+wire [4:0] Regfile_A3;
+wire [3:0] ALUOp;
+wire [1:0] ALUSrcB, PCSrc;
+wire MemtoReg, RegDst, Zero;
+
+assign WriteData = RD2;
+assign PCJump = {PC[31:28],Instr[25:0],2'b0};
+
+/*
+textrom text_rom(
+    .a(PC[11:2]),
+    .spo(Instr)
+);
+ 
+dataram data_ram (
+  .a(ALUResult[11:2]),        // input wire [9 : 0] a
+  .d(WriteData),        // input wire [31 : 0] d
+  .clk(clk),    // input wire clk
+  .we(MemWrite),      // input wire we
+  .spo(ReadData)    
+);
+*/
+
+mux memaddr(
+    IorD,
+    PC,
+    ALUOut,
+    Addr
+);
+
+
+// VERY IMPORTANT: RAM SHOULD NNNNOOOOOTTTTTT REGISTER OUTPUT!!!
+// IT IS CONFIGURED IN THE IP CORE
+// AND IT SHOULD BE SINGLE PORT BLOCK RAM !!!
+
+dtram dt_ram (
+    .addra(Addr[11:2]),
+    .dina(RD2),
+    .clka(clk),
+    .douta(MemRead),
+    .wea(MemWrite)
+);
+
+ALU mainALU (
+    ALUOp,
+    SrcA,
+    SrcB,
+    ALUResult,
+    Zero
+);
+
+Reg InstrReg(
+    clk,
+    rst_n,
+    MemRead,
+    Instr,
+    IRWrite
+);
+
+Reg DataReg(
+    clk,
+    rst_n,
+    MemRead,
+    Data,
+    1'b1
+);
+
+Ext SignExt(
+    1'b1, //Sign-extension
+    Instr[15:0],
+    SigImm
+);
+
+Reg alureg(
+    clk,
+    rst_n,
+    ALUResult,
+    ALUOut,
+    1'b1
+);
+
+mux4 pcp(
+    PCSrc,
+    ALUResult,
+    ALUOut,
+    PCJump,
+    32'bz,
+    PCp
+);
+
+assign PCEn = (Zero & Branch) | PCWrite;
+Reg prog_cnt(
+    clk,
+    rst_n,
+    PCp,
+    PC,
+    PCEn
+);
+    
+control ct1 (
+    clk,
+    rst_n,
+    Instr[31:26], //Op
+    Instr[5:0], //Funct
+
+    ALUSrcA,
+    ALUSrcB,//[1:0]
+    ALUOp,//[3:0]
+    Branch,
+    IorD,
+    IRWrite,
+    MemtoReg,
+    MemWrite,
+    PCSrc, //[1:0]
+    PCWrite,
+    RegDst,
+    RegWrite
+);
+
+//WARNING REGFILE REGISTERED OUTPUT
+reg_file Reg(
+    clk,
+    rst_n,
+    Instr[25:21],
+    Instr[20:16],
+    Regfile_A3,
+    Result,
+    RegWrite,
+    RD1,
+    RD2
+);
+
+mux alumuxA(
+    ALUSrcA,
+    PC,
+    RD1,
+    SrcA
+);
+    
+wire [31:0]SigShl;
+assign SigShl = SigImm << 2;
+mux4 alumuxB(
+    ALUSrcB,
+    RD2,
+    32'd4,
+    SigImm,
+    SigShl,
+    SrcB
+);
+
+mux resmux(
+    MemtoReg,
+    ALUOut,
+    Data,
+    Result
+);
+
+mux regmux(
+    RegDst,
+    {27'd0,Instr[20:16]},
+    {27'd0,Instr[15:11]},
+    Regfile_A3
+);
+
+endmodule
+
