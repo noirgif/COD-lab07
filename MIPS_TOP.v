@@ -8,6 +8,14 @@ module MIPS_TOP(
 //---------------------------------
 //FETCH
 //---------------------------------
+wire [31:0] PCin;
+wire [31:0] PC;
+wire ID_HDU_Stall;
+wire [31:0] PCPlusFour;
+wire [31:0] WB_ALUOut;
+wire [31:0] IF_Instr;
+
+parameter alu_add = 4'd2;
 
 Reg rPC(
     .clk(       clk),
@@ -25,7 +33,7 @@ ALU PCAdd(
 
 mux PCMux(
     .a(         PCPlusFour),
-    .b(         ALUResR),//32
+    .b(         WB_ALUOut),//32
     .sig(       PCSrc),
     .out(       PCin)//32
 );
@@ -33,7 +41,7 @@ mux PCMux(
 //32bit-wide Mem
 InstMem myInstMem(
     .addr(      PC[11:2]),
-    .out(       Instr)//32
+    .out(       IF_Instr)//32
 );
 
 
@@ -45,7 +53,7 @@ IF2ID myIF2ID(
     .clk(       clk),
     .PC(        PCPlusFour),
     .PCR(       ID_PCPlusFour),//32
-    .Instr(     Instr),//32
+    .Instr(     IF_Instr),//32
     .InstrR(    ID_Instr),//32
     .IFFlush(   IFFlush),
     .we(     ~ID_HDU_Stall),
@@ -54,7 +62,7 @@ IF2ID myIF2ID(
 
 HDU myHDU(//Hazard Detection Unit
     .EX_MemRead(EX_MemRead),
-    .EX_Rt(     EX_Rt),
+    .EX_Rd(     EX_Rd),
     .ID_Rs(     ID_Rs),
     .ID_Rt(     ID_Rt),
     .Stall(     ID_HDU_Stall) 
@@ -68,6 +76,7 @@ assign ID_Rt = ID_Instr[20:16];
 assign ID_Rd = ID_Instr[15:11];
 assign ID_Opcode = ID_Instr[31:26];
 assign ID_Funct = ID_Instr[5:0];
+wire [31:0] ID_R1, ID_R2;
 
 mux Dmux(
     .a(         Ctrl_out),//
@@ -94,17 +103,18 @@ reg_file myreg(
     .wea(       WB_RegWrite)
 );
 
+wire [31:0] SigImm;
 Ext SigExt(
     .in(        ID_Instr[15:0]),
-    .out(       Sigimm),//32
+    .out(       SigImm),//32
     .sign(      1'b1)
 );
 
-ALU CheckIfEq(
+CIB CheckIfBr(
     .alu_a(     ID_R1),
     .alu_b(     ID_R2),
-    .alu_op(    alu_sub),
-    .Zero(      ID_Eq)
+    .Instr(     ID_Instr),
+    .Branch(    ID_Branch)
 );
 
 
@@ -115,7 +125,7 @@ ALU CheckIfEq(
 
 ID2EX myID2EX(
     .clk(       clk),
-    .CtrlWB(    ID_CtrlWB),
+    .CtrlWB(    ID_CtrlWB),//
     .CtrlWBR(   EX_CtrlWB),
     .CtrlM(     ID_CtrlM),
     .CtrlMR(    EX_CtrlMR),
@@ -158,7 +168,7 @@ mux EX_RegDstMux(
 EXHU myEXHU(//Exception Handling
 );
 
-mux4 ALUSrcAMux(
+mux3 ALUSrcAMux(
     .a(         EX_RD1),
     .b(         WB_WriteData),
     .c(         M_Addr),
@@ -166,7 +176,7 @@ mux4 ALUSrcAMux(
     .out(       EX_ALUA)//32
 );
 
-mux4 ALUSrcBMux(
+mux3 ALUSrcBMux(
     .a(         EX_RD2),
     .b(         M_ALUOut),
     .c(         M_WB_WriteData),
@@ -185,7 +195,8 @@ Forw myFU(//Forward Unit
     .M_RegWrite(    M_RegWrite),
     .M_Rd(          M_Rd),
     .EX_Rs(         EX_Rs),
-    .
+    .EX_ForA(       EX_ForA),//2
+    .EX_ForB(       EX_ForB)
 );
 
 //----------------------------------
