@@ -3,11 +3,13 @@ module control(
     input [5:0] funct,
     input []    exc,
     input Branch,
-    output reg[] IF_Ctrl,//PCSrc
+    output reg[] IF_Ctrl,//PCSrc[1:0]
     output reg[] ID_Ctrl,//Jump:JLink:RegDst
-    output reg[] EX_Ctrl,
-    output reg[] M_Ctrl,
-    output reg[] WB_Ctrl
+/** WB signal = MemtoReg:RegWrite
+ *  M  signal = MemRead:MemWrite
+ *  EX signal = ALUop
+ */
+    output reg[] Ctrl_out,//pack of WB:M:EX control signal
     output IFFlush,
     output IDFlush,
     output EXFlush
@@ -73,3 +75,6 @@ begin
     endcase
 end
 
+always @*
+begin
+end

@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 module MIPS_TOP(
     input clk,
@@ -14,6 +14,8 @@ wire ID_HDU_Stall;
 wire [31:0] PCPlusFour;
 wire [31:0] WB_ALUOut;
 wire [31:0] IF_Instr;
+wire [1:0]  IF_Ctrl;
+wire [1:0]  PCSrc;
 
 parameter alu_add = 4'd2;
 
@@ -48,16 +50,15 @@ InstMem myInstMem(
 //----------------------------------
 //DECODE
 //----------------------------------
+
 IF2ID myIF2ID(
     .clk(       clk),
-    .PC(        PCPlusFour),
-    .PCR(       ID_PCPlusFour),//32
-    .Instr(     IF_Instr),//32
-    .InstrR(    ID_Instr),//32
     .IFFlush(   IFFlush),
-    .we(     ~ID_HDU_Stall),
+    .we(        ~ID_HDU_Stall),
     .Ctrl(      CtrlIF2ID)
 );
+
+control my
 
 assign ID_ORout = IDFlush | ID_HDU_Stall;
 wire [5:0] ID_Opcode, ID_Funct;
@@ -73,7 +74,7 @@ assign Link = BLink | JLink;
 
 HDU myHDU(//Hazard Detection Unit
     .EX_MemRead(EX_MemRead),
-    .EX_Rd(     EX_Rd),
+    .EX_RegD(   EX_RegD),
     .ID_Rs(     ID_Rs),
     .ID_Rt(     ID_Rt),
     .Stall(     ID_HDU_Stall) 
@@ -86,8 +87,6 @@ branch myBranch(
     .Branch(    Branch),
     .BLink(     BLink)
 );
-
-
 
 mux Dmux(
     .a(         Ctrl_out),//
@@ -109,8 +108,6 @@ reg_file myreg(
     .A2(        ID_Rt),
     .A3(        WB_RegD),
     .in(        WB_MuxOut),
-    .A1out(     ID_R1),//32
-    .A2out(     ID_R2),//32
     .wea(       WB_RegWrite)
 );
 
@@ -120,15 +117,6 @@ Ext SigExt(
     .out(       SigImm),//32
     .sign(      1'b1)
 );
-
-CIB CheckIfBr(
-    .alu_a(     ID_R1),
-    .alu_b(     ID_R2),
-    .Instr(     ID_Instr),
-    .Branch(    ID_Branch)
-);
-
-
 
 //------------------------------------------
 //EX
@@ -207,33 +195,26 @@ ALU mainALU(
 
 Forw myFU(//Forward Unit
     .M_RegWrite(    M_RegWrite),
-    .M_Rd(          M_Rd),
+    .M_RegD(        M_RegD),
+    .WB_RegD(       WB_RegD),
     .EX_Rs(         EX_Rs),
+    .EX_Rt(         EX_Rt),
     .EX_ForA(       EX_ForA),//2
-    .EX_ForB(       EX_ForB)
+    .EX_ForB(       EX_ForB)//2
 );
 
 //----------------------------------
 //M(em)
 //----------------------------------
 
-EX2MEM myEX2MEM(
-    .CtrlWB(    EX_CtrlWB),
-    .CtrlWBR(   M_CtrlWB),
-    .CtrlM(     EX_CtrlM),
-    .ALUOut(    EX_ALUOut),
-    .ALUSrcB(   EX_ALUB),
-    .ALUOutR(   M_ALUOut),
-    .ALUSrcBR(  M_ALUB),
-    .RegD(      EX_RegD)
-);
 
 DataMem myDataMem(
     .a(         M_ALUOut),
     .d(         M_WriteData),
     .clk(       clk),
     .we(        M_MemWrite),
-    .spo(       M_MemRead)
+    .ena(       M_MemRead),
+    .spo(       M_MemOut)
 );
 
 //-----------------------------------
@@ -248,9 +229,9 @@ M2WB myM2WB(
 
 mux WBmux(
     .a(         WB_ALUOut),
-    .b(         WB_MemRead),
+    .b(         WB_MemOut),
     .sig(       WB_MemtoReg)
     .out(       WB_MuxOut)
 );
 
-
+endmodule
