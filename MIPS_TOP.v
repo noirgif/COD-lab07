@@ -48,7 +48,6 @@ InstMem myInstMem(
 //----------------------------------
 //DECODE
 //----------------------------------
-
 IF2ID myIF2ID(
     .clk(       clk),
     .PC(        PCPlusFour),
@@ -60,14 +59,6 @@ IF2ID myIF2ID(
     .Ctrl(      CtrlIF2ID)
 );
 
-HDU myHDU(//Hazard Detection Unit
-    .EX_MemRead(EX_MemRead),
-    .EX_Rd(     EX_Rd),
-    .ID_Rs(     ID_Rs),
-    .ID_Rt(     ID_Rt),
-    .Stall(     ID_HDU_Stall) 
-);
-
 assign ID_ORout = IDFlush | ID_HDU_Stall;
 wire [5:0] ID_Opcode, ID_Funct;
 wire [4:0] ID_Rs, ID_Rt, ID_Rd;
@@ -77,6 +68,26 @@ assign ID_Rd = ID_Instr[15:11];
 assign ID_Opcode = ID_Instr[31:26];
 assign ID_Funct = ID_Instr[5:0];
 wire [31:0] ID_R1, ID_R2;
+wire Link;
+assign Link = BLink | JLink;
+
+HDU myHDU(//Hazard Detection Unit
+    .EX_MemRead(EX_MemRead),
+    .EX_Rd(     EX_Rd),
+    .ID_Rs(     ID_Rs),
+    .ID_Rt(     ID_Rt),
+    .Stall(     ID_HDU_Stall) 
+);
+
+branch myBranch(
+    .Instr(     ID_Instr),
+    .R1(        ID_R1),
+    .R2(        ID_R2),
+    .Branch(    Branch),
+    .BLink(     BLink)
+);
+
+
 
 mux Dmux(
     .a(         Ctrl_out),//
@@ -125,12 +136,14 @@ CIB CheckIfBr(
 
 ID2EX myID2EX(
     .clk(       clk),
-    .CtrlWB(    ID_CtrlWB),//
+    .CtrlWB(    ID_CtrlWB),//RD:RegWrite(with Link)
     .CtrlWBR(   EX_CtrlWB),
     .CtrlM(     ID_CtrlM),
     .CtrlMR(    EX_CtrlMR),
     .CtrlEX(    ID_CtrlEX),
     .CtrlEXR(   EX_CtrlEX),
+    .SigImm(    SigImm),
+    .SigImmR(   EX_SigImm),
     .R1(        ID_R1),
     .R2(        ID_R2),
     .R1R(       EX_R1),
@@ -160,8 +173,9 @@ mux EX_MFlushMux(
 mux EX_RegDstMux(
     .a(         EX_Rt),
     .b(         EX_Rd),
-    .sig(       EX_RegDst),
-    .out(       EX_RegD)
+    .c(         5'd31),
+    .sig(       {EX_Link, EX_RegDst}),
+    .out(       EX_RegD0)
 );
 
 
@@ -169,7 +183,7 @@ EXHU myEXHU(//Exception Handling
 );
 
 mux3 ALUSrcAMux(
-    .a(         EX_RD1),
+    .a(         EX_R1),
     .b(         WB_WriteData),
     .c(         M_Addr),
     .sig(       EX_ForA),
@@ -177,7 +191,7 @@ mux3 ALUSrcAMux(
 );
 
 mux3 ALUSrcBMux(
-    .a(         EX_RD2),
+    .a(         EX_R2),
     .b(         M_ALUOut),
     .c(         M_WB_WriteData),
     .sig(       EX_ForB),
