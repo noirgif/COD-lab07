@@ -18,6 +18,8 @@ parameter BGTZ = 6'b111;
 wire [5:0] opcode;
 wire [3:0] rt;
 
+reg _BLink;
+
 assign opcode = Instr[31:26];
 assign link = Instr[20];
 assign rt = Instr[19:16];
@@ -29,11 +31,15 @@ begin
         begin
             case(rt)
                 BGEZ:
+                begin
                     Branch = R1 >= 0;
-                    BLink = Branch & link;
+                    _BLink = Branch & link;
+                end
                 BLTZ:
+                begin
                     Branch = R1 < 0;
-                    BLink = Branch & link;
+                    _BLink = Branch & link;
+                end
             endcase
         end
         BLEZ:
@@ -47,6 +53,10 @@ begin
         default:
             Branch = 0;
     endcase
+    if(_BLink)
+        BLink = 1;
+    else
+        BLink = 0;
 end
 
 endmodule

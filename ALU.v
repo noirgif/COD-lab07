@@ -10,7 +10,10 @@ module ALU(
 
 
 wire Inv_a, Inv_b;
-wire [31:0] a,b;
+wire [31:0] a, b;
+reg [31:0] alu_res;
+assign AInvert = alu_op[0];
+assign BInvert = alu_op[1];
 assign Zero = ~|alu_out;
 assign a = alu_a ^ {32{AInvert}};
 assign b = alu_b ^ {32{BInvert}};
@@ -28,7 +31,7 @@ begin
 end
 
 assign Overflow = (alu_op == 4'd2) && (alu_out[31] ^ alu_a[31]) & (alu_out[31] ^ alu_b[31]);
-assign Carry = (alu_op == 4'd2) && (alu_out)
+assign Carry = (alu_op == 4'd2) && (alu_out);
 
 
 endmodule

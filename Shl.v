@@ -4,7 +4,7 @@ module Shl(
     output [31:0] out
 );
 
-assign out = in << shamt
+assign out = in << shamt;
 
 endmodule
 
