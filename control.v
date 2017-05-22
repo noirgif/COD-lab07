@@ -10,6 +10,7 @@ module control(
  *  EX signal = ALUop
  */
     output reg[] Ctrl_out,//pack of WB:M:EX control signal
+    output sig,
     output IFFlush,
     output IDFlush,
     output EXFlush

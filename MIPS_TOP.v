@@ -18,7 +18,7 @@ parameter WB = 3'd4;
 wire [31:0] PCin;
 wire [31:0] PC;
 wire ID_HDU_Stall;
-wire [31:0] PCPlusFour[EX:IF];
+wire [31:0] PCP4[EX:IF];
 wire [31:0] ALUOut[WB:EX];
 wire [31:0] Instr[EX:IF];
 wire [1:0]  IF_Ctrl;
@@ -37,11 +37,11 @@ ALU PCAdd(
     .alu_a(     PC),
     .alu_b(     32'd4),
     .alu_op(    alu_add),
-    .alu_out(   PCPlusFour)//32
+    .alu_out(   PCP4)//32
 );
 
 mux PCMux(
-    .a(         PCPlusFour),
+    .a(         PCP4),
     .b(         ALUOut[WB]),//32
     .sig(       PCSrc),
     .out(       PCin)//32
@@ -65,13 +65,15 @@ IF2ID myIF2ID(
     .Ctrl(      CtrlIF2ID)
 );
 
-control my
+control mycontrol(
+
+);
 
 assign ID_ORout = IDFlush | ID_HDU_Stall;
 wire [31:0] BAddr, JAddr;
 wire [5:0] Opcode[EX:ID], Funct[EX:ID];
 wire [4:0] Rs[EX:ID], Rt[EX:ID], Rd[EX:ID];
-assign Rs[ID] = Instr[ID][25:21]
+assign Rs[ID] = Instr[ID][25:21];
 assign Rt[ID] = Instr[ID][20:16];
 assign Rd[ID] = Instr[ID][15:11];
 assign Opcode[ID] = Instr[ID][31:26];
@@ -79,8 +81,8 @@ assign Funct[ID] = Instr[ID][5:0];
 wire [31:0] ID_R1, ID_R2;
 wire Link;
 assign Link = BLink | JLink;
-assign BAddr = PC[ID] + SigImmShl;
-assign JAddr = {PC[ID][31:26], Instr[ID][25:0], 2'b00};
+assign BAddr = PCP4[ID] + SigImmShl;
+assign JAddr = {PCP4[ID][31:26], Instr[ID][25:0], 2'b00};
 
 HDU myHDU(//Hazard Detection Unit
     .EX_MemRead(MemRead[EX]),
@@ -102,13 +104,13 @@ mux Dmux(
     .a(         Ctrl_out),//
     .b(         32'd0),
     .sig(       ID_ORout),
-    .out(       Ctrl_out1)//
+    .out(       ID_Ctrl_out1)//
 );
 
 ALU BAddrCalc(
     .alu_a(     Shl2_imm),
-    .alu_b(     PC[ID]),
-    .alu_op(    ALU_ADD),
+    .alu_b(     PCP4[ID]),
+    .alu_op(    4'd2),
     .alu_out(   BranchAddr)
 );
 
@@ -117,7 +119,9 @@ reg_file myreg(
     .A1(        Rs[ID]),
     .A2(        Rt[ID]),
     .A3(        RegD[WB]),
-    .in(        MuxOut[WB]),
+    .in(        WB_MuxOut),
+    .A1out(     R1[ID]),
+    .A2out(     R2[ID]),
     .wea(       RegWrite[WB])
 );
 
@@ -138,18 +142,18 @@ Shl myShl2(
 //EX
 //------------------------------------------
 
-mux EX_WBFlushMux(
-    .a(         CtrlWB[EX]),
+mux EXFlushMux0(
+    .a(         Ctrl_outWB[EX]),
     .b(         32'b0),
     .sig(       EXFlush),
-    .out(       CtrlWBP[EX])
+    .out(       EX_Ctrl_outWB1)
 );
 
-mux EX_MFlushMux(
-    .a(         CtrlM[EX]),
+mux EXFlushMux1(
+    .a(         Ctrl_outM[EX]),
     .b(         32'b0),
     .sig(       EXFlush),
-    .out(       CtrlMP[EX])
+    .out(       EX_Ctrl_outM1)
 );
 
 mux EX_RegDstMux(
@@ -162,29 +166,30 @@ mux EX_RegDstMux(
 
 
 EXHU myEXHU(//Exception Handling
+    .exc(exc)
 );
 
 mux3 ALUSrcAMux(
     .a(         R1[EX]),
-    .b(         WriteData[WB]),
-    .c(         Addr[M]),
-    .sig(       ForA[EX]),
-    .out(       ALUA[EX])//32
+    .b(         WB_MuxOut),
+    .c(         ALUOut[M]),
+    .sig(       ForA),
+    .out(       ALUA)//32
 );
 
 mux3 ALUSrcBMux(
     .a(         R2[EX]),
     .b(         ALUOut[M]),
     .c(         WriteData[WB][M]),
-    .sig(       ForB[EX]),
-    .out(       ALUB[EX])//32
+    .sig(       ForB),
+    .out(       ALUB)//32
 );
 
-ALU mainALU(
-    .alu_a(     ALUA[EX]),
-    .alu_b(     ALUB[EX]),
-    .alu_op(    ALUOp[EX]),
-    .alu_out(   ALUOut[EX])
+realALU mainALU(
+    .ALU_a(     ALUA[EX]),
+    .ALU_b(     ALUB[EX]),
+    .ALU_op(    (Instr[EX][31:26] ? Instr[EX][31:26] : Instr[EX][5:0])),
+    .ALU_out(   ALUOut[EX])
 );
 
 Forw myFU(//Forward Unit
@@ -193,8 +198,8 @@ Forw myFU(//Forward Unit
     .WB_RegD(       RegD[WB]),
     .EX_Rs(         Rs[EX]),
     .EX_Rt(         Rt[EX]),
-    .EX_ForA(       ForA[EX]),//2
-    .EX_ForB(       ForB[EX])//2
+    .EX_ForA(       ForA),//2
+    .EX_ForB(       ForB)//2
 );
 
 //----------------------------------
@@ -204,7 +209,7 @@ Forw myFU(//Forward Unit
 
 DataMem myDataMem(
     .a(         ALUOut[M]),
-    .d(         WriteData[M]),
+    .d(         R2[M]),
     .clk(       clk),
     .we(        MemWrite[M]),
     .ena(       MemRead[M]),
@@ -217,15 +222,54 @@ DataMem myDataMem(
 
 M2WB myM2WB(
     .clk(       clk),
-    .Ctrl(      CtrlWB[M]),
-    .CtrlR(     CtrlWB[WB])
+    .Ctrl(      Ctrl_outWB[M]),
+    .CtrlR(     Ctrl_outWB[WB])
 );
 
 mux WBmux(
     .a(         ALUOut[WB]),
     .b(         MemOut[WB]),
     .sig(       MemtoReg[WB])
-    .out(       MuxOut[WB])
+    .out(       WB_MuxOut)
 );
 
+integer i;
+//===================================
+//Updating
+//===================================
+always @(posedge clk)
+begin
+    if(IFFlush)
+        Instr <= 0;
+    else
+    begin
+        if(~ID_HDU_Stall)
+        begin
+            PC <= PCin;
+            PCP4[ID] <= PCP4[IF];
+            Instr[ID] <= Instr[IF];
+        end
+    end
+
+    Ctrl_outEX[EX] <= ID_Ctrl_out1[];
+    Ctrl_outM[EX] <= ID_Ctrl_out1[];
+    Ctrl_outWB[EX] <= ID_Ctrl_out1[];
+    PCP4[EX] <= PCP4[ID];
+    Rs[EX] <= Rs[ID];
+    Rt[EX] <= Rt[ID];
+    Instr[EX] <= Instr[ID];
+    R1[EX] <= R1[ID];
+    R2[EX] <= R2[ID];
+    
+    Ctrl_outM[M] <= EX_Ctrl_outM1;
+    Ctrl_outWB[M] <= EX_Ctrl_outWB1;
+    RegD[M] <= RegD[EX];
+    ALUOut[M] <= ALUOut[EX];
+    R2[M] <= R2[EX];
+
+    RegD[WB] <= RegD[M];
+    Ctrl_outWB[WB] <= Ctrl_outWB[M];
+    ALUOut[WB] <= ALUOut[M];
+    MemOut[WB] <= MemOut[M];
+end
 endmodule
