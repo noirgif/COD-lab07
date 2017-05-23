@@ -8,7 +8,7 @@ module MIPS_TOP(
 parameter IF = 0;
 parameter ID = 1;
 parameter EX = 2;
-parameter M  = 3;
+parameter M = 3;
 parameter WB = 4;
 
 wire [31:0] PCin;
@@ -16,8 +16,8 @@ wire [31:0] BJAddr;
 reg [31:0] PC;
 wire ID_HDU_Stall;
 reg [31:0] PCP4[EX:ID];
-reg [31:0] ALUOut[WB:EX];
-reg [31:0] Instr[EX:IF];
+reg [31:0] ALUOut[WB:M];
+reg [31:0] Instr[EX:ID];
 wire [1:0]  IF_Ctrl;
 wire [1:0]  PCSrc;
 wire [31:0] IF_PCP4;
@@ -37,7 +37,7 @@ wire Branch, Jump;
 reg MemRead[M:EX];
 reg MemWrite[M:EX];
 reg [1:0]Ctrl_outM[M:EX];
-reg [4:0]RegD[WB:EX];
+reg [4:0]RegD[WB:M];
 reg RegWrite[WB:EX];
 reg MemtoReg[WB:EX];
 reg [1:0]Ctrl_outWB[WB:EX];
@@ -52,7 +52,6 @@ reg [5:0] Ctrl_outEX;
 wire [31:0] SigImmShl;
 wire [31:0] WB_MuxOut;
 wire [31:0] ID_ALUSrcA;
-reg [31:0] SigImm[EX:ID];
 
 //---------------------------------
 //FETCH
@@ -69,8 +68,8 @@ ALU PCAdd(
     .alu_out(   IF_PCP4)//32
 );
 
-mux PCMux(
-    .a(         PCP4[IF]),
+mux3 PCMux(
+    .a(         IF_PCP4),
     .b(         BJAddr),
     .c(         32'h80000180),
     .sig(       PCSrc),
@@ -79,8 +78,8 @@ mux PCMux(
 
 //32bit-wide Mem
 InstMem myInstMem(
-    .addr(      PC[11:2]),
-    .out(       IF_Instr)//32
+    .a(      PC[11:2]),
+    .spo(       IF_Instr)//32
 );
 
 
@@ -92,51 +91,51 @@ InstMem myInstMem(
 parameter JAL = 6'h3;
 parameter JR = 6'h8;
 
+wire [31:0]ID_SigImm;
+
 assign ID_ORout = IDFlush | ID_HDU_Stall;
-assign Opcode[ID] = Instr[ID][31:26];
-assign Opcode[EX] = Instr[EX][31:26];
-assign Funct[ID] = Instr[ID][5:0];
-assign Funct[EX] = Instr[EX][5:0];
+assign Opcode[1] = Instr[1][31:26];
+assign Opcode[2] = Instr[2][31:26];
+assign Funct[1] = Instr[1][5:0];
+assign Funct[2] = Instr[2][5:0];
 assign JLink = ID_Ctrl[2];
 assign Link = BLink | JLink;
-assign JAddr = (Funct[ID] == JR) ? ID_R1 : {{32'd4 + PCP4[ID]}[31:26], Instr[ID][25:0], 2'b00};
+assign JAddr = (Funct[1] == JR) ? ID_R1 : {IF_PCP4[31:26], Instr[1][25:0], 2'b00};
 assign Jump = ID_Ctrl[1];
 assign BJAddr = Branch ? BAddr : JAddr;
 
+integer i,j;
 always @*
 begin
-    Rs[ID] = Instr[ID][25:21];
-    Rt[ID] = Instr[ID][20:16];
-    Rd[ID] = Instr[ID][15:11];
+    Rs[1] = Instr[1][25:21];
+    Rt[1] = Instr[1][20:16];
+    Rd[1] = Instr[1][15:11];
+end   
+  
+always @*
+begin
+    for(i = EX; i <= M; i = i + 1)
+    begin
+        MemRead[i] = Ctrl_outM[i][1];
+        MemWrite[i] = Ctrl_outM[i][0];
+    end
 end
 
-generate
-genvar i;
-        for(i = EX; i <= M; i = i + 1)
-        begin :gen1
-            always @*
-            begin
-                MemRead[i] = Ctrl_outM[i][1];
-                MemWrite[i] = Ctrl_outM[i][0];
-            end
-        end
-endgenerate
 
-generate
-genvar j;
-        for(j = EX; j <= WB; j = j + 1)
-        begin :gen2
-            always @*
-            begin
-                RegWrite[j] = Ctrl_outWB[j][0];
-                MemtoReg[j] = Ctrl_outWB[j][1];
-            end
-         end
-endgenerate
+
+always @*
+begin
+    for(j = EX; j <= WB; j = j + 1)
+    begin
+        RegWrite[j] = Ctrl_outWB[j][0];
+        MemtoReg[j] = Ctrl_outWB[j][1];
+    end
+end
+
 
 control myControl(
-    .opcode(    Opcode[ID]),
-    .funct(     Funct[ID]),
+    .opcode(    Opcode[1]),
+    .funct(     Funct[1]),
     .exc(       exc),
     .Branch(    Branch),
     .IF_Ctrl(   IF_Ctrl),
@@ -148,24 +147,24 @@ control myControl(
 );
 
 HDU myHDU(//Hazard Detection Unit
-    .EX_MemRead(MemRead[EX]),
+    .EX_MemRead(MemRead[2]),
     .EX_RegD(   EX_RegD),
-    .ID_Rs(     Rs[ID]),
-    .ID_Rt(     Rt[ID]),
+    .ID_Rs(     Rs[1]),
+    .ID_Rt(     Rt[1]),
     .Stall(     ID_HDU_Stall) 
 );
 
 branch myBranch(
-    .Instr(     Instr[ID]),
+    .Instr(     Instr[1]),
     .R1(        ID_R1),
     .R2(        ID_R2),
     .Branch(    Branch),
     .BLink(     BLink)
 );
 
-mux Dmux(
+mux#(10) Dmux(
     .a(         Ctrl_out),//
-    .b(         32'd0),
+    .b(         10'd0),
     .sig(       ID_ORout),
     .out(       Ctrl_out1)//
 );
@@ -173,15 +172,16 @@ mux Dmux(
 
 ALU BAddrCalc(
     .alu_a(     SigImmShl),
-    .alu_b(     PCP4[IF]),
+    .alu_b(     IF_PCP4),
     .alu_op(    4'd2),
     .alu_out(   BAddr)
 );
 
 reg_file myreg(
     .clk(       clk),
-    .A1(        Rs[ID]),
-    .A2(        Rt[ID]),
+    .rst_n(     rst_n),
+    .A1(        Rs[1]),
+    .A2(        Rt[1]),
     .A3(        RegD[WB]),
     .in(        WB_MuxOut),
     .A1out(     ID_R1),
@@ -190,13 +190,13 @@ reg_file myreg(
 );
 
 Ext SigExt(
-    .in(        Instr[ID][15:0]),
-    .out(       SigImm[ID]),//32
-    .sign(      1'b1)
+    .in(        Instr[1]),
+    .sign(      1'b1),
+    .out(       ID_SigImm)//32
 );
 
 Shl myShl2(
-    .in(        SigImm[ID]),
+    .in(        ID_SigImm),
     .shamt(     32'd2),
     .out(       SigImmShl)
 );
@@ -205,7 +205,7 @@ Shl myShl2(
 mux ALUSrcAMux0(
     .a(         ID_R1),
     //delay slot
-    .b(         PCP4[IF]),
+    .b(         IF_PCP4),
     .sig(       Link),
     .out(       ID_ALUSrcA)
 );
@@ -214,38 +214,38 @@ mux ALUSrcAMux0(
 //EX
 //------------------------------------------
 reg [31:0] ALUSrcA;
-reg [31:0] ALUSrcB;
+wire [31:0] ALUSrcB;
 wire EX_IType, EX_JType, EX_RType;
 wire EX_RegDst;
 wire [1:0] ForA, ForB;
 wire [31:0] ALUA, ALUB;
 reg [31:0] EX_SigImm;
 assign EX_RegDst = EX_RType;
-assign EX_JType = Opcode[EX] == 6'd2 || Opcode[EX] == 6'd3;
-assign EX_RType = !Opcode[EX];
+assign EX_JType = Opcode[2] == 6'd2 || Opcode[2] == 6'd3;
+assign EX_RType = !Opcode[2];
 assign EX_IType = !EX_RType && !EX_JType;
 
 
 wire [1:0] EX_Ctrl_outWB1;
 wire [1:0] EX_Ctrl_outM1;
 wire [31:0] EX_ALUOut;
-mux EXFlushMux0(
-    .a(         Ctrl_outWB[EX]),
-    .b(         32'b0),
+mux#(2) EXFlushMux0(
+    .a(         Ctrl_outWB[2]),
+    .b(         2'b0),
     .sig(       EXFlush),
     .out(       EX_Ctrl_outWB1)
 );
 
-mux EXFlushMux1(
-    .a(         Ctrl_outM[EX]),
-    .b(         32'b0),
+mux#(2) EXFlushMux1(
+    .a(         Ctrl_outM[2]),
+    .b(         2'b0),
     .sig(       EXFlush),
     .out(       EX_Ctrl_outM1)
 );
 
-mux EX_RegDstMux(
-    .a(         Rt[EX]),
-    .b(         Rd[EX]),
+mux3#(5) EX_RegDstMux(
+    .a(         Rt[2]),
+    .b(         Rd[2]),
     .c(         5'd31),
     //jal(J-Type) use $31 but jalr(R-Type) use $rd
     .sig(       {!EX_RType & EX_Link, EX_RegDst}),
@@ -254,28 +254,29 @@ mux EX_RegDstMux(
 
 
 EXHU myEXHU(//Exception Handling
+    .rst_n(rst_n),
     .exc(exc)
 );
 
 mux3 ALUSrcAMux(
     .a(         ALUSrcA),
     .b(         WB_MuxOut),
-    .c(         ALUOut[M]),
+    .c(         ALUOut[3]),
     .sig(       ForA),
     .out(       ALUA)//32
 );
 
 //SW needs R2 output, so the mux is put into EX(
 mux ALUSrcBMux0(
-    .a(         R2[EX]),
+    .a(         R2[2]),
     .b(         EX_SigImm),
-    .sig(       |Instr[EX][31:26]),
+    .sig(       |Instr[2][31:26]),
     .out(       ALUSrcB)
 );
 
 mux3 ALUSrcBMux(
     .a(         ALUSrcB),
-    .b(         ALUOut[M]),
+    .b(         ALUOut[3]),
     .c(         WB_MuxOut),
     .sig(       ForB),
     .out(       ALUB)//32
@@ -284,17 +285,19 @@ mux3 ALUSrcBMux(
 realALU mainALU(
     .ALU_a(     ALUA),
     .ALU_b(     ALUB),
-    .ALU_op(    (EX_RType ? Instr[EX][5:0] : Instr[EX][31:26])),
+    .opcode(    (EX_RType ? Instr[2][5:0] : Instr[2][31:26])),
+    .shamt(     Instr[2][10:6]),
     .sig(       EX_RType),
     .ALU_out(   EX_ALUOut)
 );
 
 Forw myFU(//Forward Unit
-    .M_RegWrite(    RegWrite[M]),
-    .M_RegD(        RegD[M]),
-    .WB_RegD(       RegD[WB]),
-    .EX_Rs(         Rs[EX]),
-    .EX_Rt(         Rt[EX]),
+    .M_RegWrite(    RegWrite[3]),
+    .M_RegD(        RegD[3]),
+    .WB_RegWrite(   RegWrite[4]),
+    .WB_RegD(       RegD[4]),
+    .EX_Rs(         Rs[2]),
+    .EX_Rt(         Rt[2]),
     .EX_ForA(       ForA),//2
     .EX_ForB(       ForB)//2
 );
@@ -303,15 +306,16 @@ Forw myFU(//Forward Unit
 //M(em)
 //----------------------------------
 
-reg MemOut[WB:M];
+reg [31:0]MemOut[WB:WB];
+wire [31:0] M_MemOut;
 DataMem myDataMem(
-    .a(         ALUOut[M]),
-    .d(         R2[M]),
+    .a(         ALUOut[3][11:2]),
+    .d(         R2[3]),
     .clk(       clk),
-    .we(        MemWrite[M]),
+    .we(        MemWrite[3]),
     //MemRead should be read enable, not Memory enable, correspoding signal in control.v is suceptible to future change 
-    .ena(       MemRead[M]),
-    .spo(       MemOut[M])
+    //.ena(       MemRead[3]),
+    .spo(       M_MemOut)
 );
 
 //-----------------------------------
@@ -319,52 +323,61 @@ DataMem myDataMem(
 //-----------------------------------
 
 mux WBmux(
-    .a(         ALUOut[WB]),
-    .b(         MemOut[WB]),
-    .sig(       MemtoReg[WB]),
+    .a(         ALUOut[4]),
+    .b(         MemOut[4]),
+    .sig(       MemtoReg[4]),
     .out(       WB_MuxOut)
 );
 
 //==================================================
 //Updating sequence, too many wires to make a module
 //==================================================
-always @(posedge clk)
+always @(posedge clk, negedge rst_n)
 begin
-    if(IFFlush)
-        Instr[ID] <= 0;
+    if(~rst_n)
+    begin
+        PC <= 0;
+        Instr[1] <= 0;
+        PCP4[1] <= 0;
+    end
     else
     begin
-        if(~ID_HDU_Stall)
+        if(IFFlush)
+            Instr[1] <= 0;
+        else
         begin
-            PC <= PCin;
-            PCP4[ID] <= IF_PCP4;
-            Instr[ID] <= IF_Instr;
+            if(~ID_HDU_Stall)
+            begin
+                PC <= PCin;
+                PCP4[1] <= IF_PCP4;
+                Instr[1] <= IF_Instr;
+            end
         end
-    end
-
-    EX_Link <= Link;
-    ALUSrcA <= ID_ALUSrcA;
-    SigImm[EX] <= SigImm[ID];
-    Ctrl_outEX <= Ctrl_out1[5:0];
-    Ctrl_outM[EX] <= Ctrl_out1[7:6];
-    Ctrl_outWB[EX] <= Ctrl_out1[9:8];
-    PCP4[EX] <= PCP4[ID];
-    Rs[EX] <= Instr[ID][25:21];
-    Rt[EX] <= Instr[ID][20:16];
-    Instr[EX] <= Instr[ID];
-    R1[EX] <= ID_R1;
-    R2[EX] <= ID_R2;
+        EX_Link <= Link;
+        ALUSrcA <= ID_ALUSrcA;
+        EX_SigImm <= ID_SigImm;
+        Ctrl_outEX <= Ctrl_out1[5:0];
+        Ctrl_outM[2] <= Ctrl_out1[7:6];
+        Ctrl_outWB[2] <= Ctrl_out1[9:8];
+        PCP4[2] <= PCP4[1];
+        Rs[2] <= Instr[1][25:21];
+        Rt[2] <= Instr[1][20:16];
+        Instr[2] <= Instr[1];
+        R1[2] <= ID_R1;
+        R2[2] <= ID_R2;
+        Rd[2] <= Rd[1];
+        
+        Ctrl_outM[3] <= EX_Ctrl_outM1;
+        Ctrl_outWB[3] <= EX_Ctrl_outWB1;
+        RegD[3] <= EX_RegD;
+        ALUOut[3] <= EX_ALUOut;
+        R2[3] <= R2[2];
     
-    Ctrl_outM[M] <= EX_Ctrl_outM1;
-    Ctrl_outWB[M] <= EX_Ctrl_outWB1;
-    RegD[M] <= RegD[EX];
-    ALUOut[M] <= EX_ALUOut;
-    R2[M] <= R2[EX];
-
-    RegD[WB] <= RegD[M];
-    Ctrl_outWB[WB] <= Ctrl_outWB[M];
-    ALUOut[WB] <= ALUOut[M];
-    MemOut[WB] <= MemOut[M];
+        RegD[4] <= RegD[3];
+        Ctrl_outWB[4] <= Ctrl_outWB[3];
+        ALUOut[4] <= ALUOut[3];
+        MemOut[4] <= M_MemOut;
+    end
 end
 
 endmodule

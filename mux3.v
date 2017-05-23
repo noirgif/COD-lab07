@@ -11,9 +11,9 @@ module mux3
 always @*
 begin
     case(sig)
-       0: out = a0;
-       1: out = a1;
-       default: out = a2;
+       0: out = a;
+       1: out = b;
+       default: out = c;
     endcase
 end
 
