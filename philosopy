@@ -1,0 +1,18 @@
+使用如IF_的前缀，或[IF]的index（由于vivado原因？在传入模块变量时，index无法使用parameter）表示wire和module和部分reg
+
+phase/parameter对照表
+
+|IF|  0|
+|ID|  1|
+|..| ..|
+|WB|  4|
+
+如EX_Link即表示EX阶段的Link信号（是否需要将PC写入寄存器）
+
+某一阶段的控制信号使用类似Ctrl_outM表示，Ctrl_outWB[M]即表示传输到内存读写阶段（M(em) phase)的WB阶段控制信号。
+
+使用延迟槽，因此Branch和Jump地址的计算（在ID）使用IF的PC+4。使用分支预测，不需要延迟槽时需要改回来
+
+想做的：
+
+

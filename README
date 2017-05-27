@@ -1,0 +1,15 @@
+文件列表：
+* 计算ALU.v 
+* 判断是否分支 branch.v 
+* 控制信号（除了分支信号） control.v 
+* 异常处理 EXHU.v 
+* 位拓展 Ext.v 
+* 转发控制 Forw.v 
+* Hazard检测 HDU.v 
+* 顶层模块 MIPS_TOP.v 
+* 3选1 mux3.v 
+* 2选1 mux.v 
+* 大体思路 philosopy 
+* 什么运算都往里塞的 realALU.v
+* 寄存器文件  reg_file.v
+* 左移 Shl.v

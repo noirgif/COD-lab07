@@ -11,18 +11,16 @@ module Forw(
 
 always @*
 begin
-    if(M_RegWrite)
+    if(M_RegWrite && EX_Rs && (EX_Rs == M_RegD))
     begin
-        if(!(|EX_Rs) & (EX_Rs == M_RegD))//M first, then WB, $0 is exception
-        begin
+        //M first, then WB, $0 is exception
         //TO-DO: Forward MemRead in MEM phase
-                EX_ForA = 2'b1;
-        end
+                EX_ForA = 2'd2;
     end
     else
     begin
-        if(WB_RegWrite & !(|EX_Rs) & (EX_Rs == WB_RegD))
-            EX_ForA = 2'd2;
+        if(WB_RegWrite && EX_Rs && (EX_Rs == WB_RegD))
+            EX_ForA = 2'd1;
         else
             EX_ForA = 2'b0;
     end
@@ -30,12 +28,12 @@ end
 
 always @*
 begin
-    if(M_RegWrite & !(|EX_Rt) & (EX_Rt == M_RegD))//M first, then WB, $0 is exception
-        EX_ForB = 2'd2;
+    if(M_RegWrite && EX_Rt && (EX_Rt == M_RegD))//M first, then WB, $0 is exception
+        EX_ForB = 2'd1;
     else
     begin
-        if(WB_RegWrite & !(|EX_Rt) & (EX_Rt == WB_RegD))
-            EX_ForB = 2'b1;
+        if(WB_RegWrite && EX_Rt && (EX_Rt == WB_RegD))
+            EX_ForB = 2'd2;
         else
             EX_ForB = 2'b0;
     end

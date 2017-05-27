@@ -72,7 +72,9 @@ begin
             ANDI: ALU_out = ALU_a & {16'h0, ALU_b[15:0]};
             ORI: ALU_out = ALU_a & {16'h0, ALU_b[15:0]};
             LUI: ALU_out = ALU_b << 16;
+            LW: ALU_out = ALU_a + ALU_b;
             XORI: ALU_out = ALU_a ^ {16'h0, ALU_b[15:0]};
+            SW: ALU_out = ALU_a + ALU_b;
         endcase
     end
     if(overflow)

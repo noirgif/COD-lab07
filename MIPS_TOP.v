@@ -41,8 +41,8 @@ reg [4:0]RegD[WB:M];
 reg RegWrite[WB:EX];
 reg MemtoReg[WB:EX];
 reg [1:0]Ctrl_outWB[WB:EX];
-reg [31:0]R1[WB:ID];
-reg [31:0]R2[WB:ID];
+reg [31:0]R1[EX:EX];
+reg [31:0]R2[M:EX];
 wire exc, IFFlush, IDFlush, EXFlush;
 wire [9:0] Ctrl_out;
 wire [9:0] Ctrl_out1;
@@ -58,8 +58,12 @@ wire [31:0] ID_ALUSrcA;
 //---------------------------------
 
 parameter alu_add = 4'd2;
-
+wire [31:0] IF_JAddr, IF_BAddr;
+reg wasj, wasbr;
+wire mis;
+assign mis = (wasbr ^ Branch) | (wasj ^ Jump);
 assign PCSrc = IF_Ctrl;
+assign IF_JAddr = {IF_PCP4[31:26], Instr[1][25:0], 2'b00};
 
 ALU PCAdd(
     .alu_a(     PC),
@@ -82,6 +86,35 @@ InstMem myInstMem(
     .spo(       IF_Instr)//32
 );
 
+branchpre mybrp(
+    .clk(       clk),
+    .rst_n(     rst_n),
+    .Instr(     IF_Instr),
+    .istaken(   Branch || Jump),
+    .takebr(    takebr),
+    .takej(     takej)
+);
+
+always @(posedge clk, negedge rst_n)
+begin
+    if(~rst_n)
+    begin
+        wasj <= 0;
+        wasbr <= 0;
+    end
+    else
+    begin
+        wasj <= ~mis & takej;
+        wasbr <= ~mis & takebr;
+    end
+end
+
+ALU IF_BAddrCalc(
+    .alu_a(     $signed(IF_Instr[15:0])),
+    .alu_b(     IF_PCP4),
+    .alu_op(    4'd2),
+    .alu_out(   IF_BAddr)
+);
 
 //----------------------------------
 //DECODE
@@ -100,7 +133,7 @@ assign Funct[1] = Instr[1][5:0];
 assign Funct[2] = Instr[2][5:0];
 assign JLink = ID_Ctrl[2];
 assign Link = BLink | JLink;
-assign JAddr = (Funct[1] == JR) ? ID_R1 : {IF_PCP4[31:26], Instr[1][25:0], 2'b00};
+assign JAddr = (Funct[1] == JR) ? ID_R1 : {PCP4[1][31:26], Instr[1][25:0], 2'b00};
 assign Jump = ID_Ctrl[1];
 assign BJAddr = Branch ? BAddr : JAddr;
 
@@ -136,6 +169,8 @@ end
 control myControl(
     .opcode(    Opcode[1]),
     .funct(     Funct[1]),
+    .wasbr(     wasbr),
+    .wasj(      wasj),  
     .exc(       exc),
     .Branch(    Branch),
     .IF_Ctrl(   IF_Ctrl),
@@ -169,10 +204,10 @@ mux#(10) Dmux(
     .out(       Ctrl_out1)//
 );
 
-
+//Beware! Using PC in ID to calculate
 ALU BAddrCalc(
     .alu_a(     SigImmShl),
-    .alu_b(     IF_PCP4),
+    .alu_b(     PCP4[1]),
     .alu_op(    4'd2),
     .alu_out(   BAddr)
 );
@@ -182,11 +217,11 @@ reg_file myreg(
     .rst_n(     rst_n),
     .A1(        Rs[1]),
     .A2(        Rt[1]),
-    .A3(        RegD[WB]),
+    .A3(        RegD[4]),
     .in(        WB_MuxOut),
     .A1out(     ID_R1),
     .A2out(     ID_R2),
-    .wea(       RegWrite[WB])
+    .wea(       RegWrite[4])
 );
 
 Ext SigExt(
@@ -206,7 +241,7 @@ mux ALUSrcAMux0(
     .a(         ID_R1),
     //delay slot
     .b(         IF_PCP4),
-    .sig(       Link),
+    .sig(       Branch | Jump),
     .out(       ID_ALUSrcA)
 );
 
@@ -229,6 +264,7 @@ assign EX_IType = !EX_RType && !EX_JType;
 wire [1:0] EX_Ctrl_outWB1;
 wire [1:0] EX_Ctrl_outM1;
 wire [31:0] EX_ALUOut;
+wire [31:0] M_MemOut;
 mux#(2) EXFlushMux0(
     .a(         Ctrl_outWB[2]),
     .b(         2'b0),
@@ -260,7 +296,7 @@ EXHU myEXHU(//Exception Handling
 
 mux3 ALUSrcAMux(
     .a(         ALUSrcA),
-    .b(         WB_MuxOut),
+    .b(         M_MemOut),
     .c(         ALUOut[3]),
     .sig(       ForA),
     .out(       ALUA)//32
@@ -268,18 +304,18 @@ mux3 ALUSrcAMux(
 
 //SW needs R2 output, so the mux is put into EX(
 mux ALUSrcBMux0(
-    .a(         R2[2]),
+    .a(         ALUSrcB),
     .b(         EX_SigImm),
     .sig(       |Instr[2][31:26]),
-    .out(       ALUSrcB)
+    .out(       ALUB)
 );
 
 mux3 ALUSrcBMux(
-    .a(         ALUSrcB),
+    .a(         R2[2]),
     .b(         ALUOut[3]),
     .c(         WB_MuxOut),
     .sig(       ForB),
-    .out(       ALUB)//32
+    .out(       ALUSrcB)//32
 );
 
 realALU mainALU(
@@ -303,11 +339,10 @@ Forw myFU(//Forward Unit
 );
 
 //----------------------------------
-//M(em)
+//M(em)r
 //----------------------------------
 
 reg [31:0]MemOut[WB:WB];
-wire [31:0] M_MemOut;
 DataMem myDataMem(
     .a(         ALUOut[3][11:2]),
     .d(         R2[3]),
@@ -342,17 +377,29 @@ begin
     end
     else
     begin
-        if(IFFlush)
+        if(IFFlush | mis)
             Instr[1] <= 0;
         else
         begin
             if(~ID_HDU_Stall)
             begin
-                PC <= PCin;
-                PCP4[1] <= IF_PCP4;
                 Instr[1] <= IF_Instr;
             end
         end
+        if(mis)
+            PC <= (Branch | Jump)? BJAddr : PCP4[ID];
+        else
+        if(takebr)
+            PC <= IF_BAddr;
+        else
+        if(takej)
+            PC <= IF_JAddr;
+        else
+        begin
+            if(~ID_HDU_Stall)
+                PC <= PCin;
+        end
+        PCP4[1] <= IF_PCP4;
         EX_Link <= Link;
         ALUSrcA <= ID_ALUSrcA;
         EX_SigImm <= ID_SigImm;
@@ -371,7 +418,7 @@ begin
         Ctrl_outWB[3] <= EX_Ctrl_outWB1;
         RegD[3] <= EX_RegD;
         ALUOut[3] <= EX_ALUOut;
-        R2[3] <= R2[2];
+        R2[3] <= ALUSrcB;
     
         RegD[4] <= RegD[3];
         Ctrl_outWB[4] <= Ctrl_outWB[3];

@@ -29,11 +29,11 @@ end
 always @*
 begin
     if(A1 != 0)
-        A1out = reg_file[A1];
+        A1out = (wea && A1==A3) ? in :reg_file[A1];
     else
         A1out = 0;
     if(A2 != 0)
-        A2out = reg_file[A2];
+        A2out = (wea && A2==A3) ? in :reg_file[A2];
     else
         A2out = 0;
 end

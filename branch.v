@@ -45,7 +45,7 @@ begin
         BLEZ:
             Branch = R1 <= 0;
         BGTZ:
-            Branch = R1 <= 0;
+            Branch = R1 > 0;
         BEQ:
             Branch = R1 == R2;
         BNE:

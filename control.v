@@ -4,6 +4,8 @@ module control(
     //exception, maybe turned into exception code one day
     input exc,
     input Branch,
+    input wasbr,
+    input wasj,
     output reg[1:0] IF_Ctrl,//PCSrc[1:0]
     output reg[2:0] ID_Ctrl,//JLink:Jump:RegDst
 /** WB signal = MemtoReg:RegWrite
@@ -35,7 +37,8 @@ parameter ITYPE = 2'h1;
 parameter JTYPE = 2'h2;
 reg [1:0] optype;
 
-assign IFFlush = |exc;
+//TO-DO check JR flush
+assign IFFlush = (wasbr ^ Branch) || (!opcode && funct[5:1] == 4) || |exc;
 assign IDFlush = |exc;
 assign EXFlush = |exc;
 
@@ -76,7 +79,6 @@ begin
     end
 end
 
-//check whether instruction is JR or JALR without taking isRType into account
 wire isJALR, isJR;
 assign isJALR = funct == 6'h9;
 assign isJR = funct[5:1] == 5'h4;
