@@ -2,7 +2,9 @@
 
 module MIPS_TOP(
     input clk,
-    input rst_n
+    input rst_n,
+    output [7:0] seg,
+    output [3:0] an
 );
 
 parameter IF = 0;
@@ -47,7 +49,6 @@ wire exc, IFFlush, IDFlush, EXFlush;
 wire [9:0] Ctrl_out;
 wire [9:0] Ctrl_out1;
 wire [4:0] EX_RegD;
-reg EX_Link;
 reg [5:0] Ctrl_outEX;
 wire [31:0] SigImmShl;
 wire [31:0] WB_MuxOut;
@@ -58,12 +59,12 @@ wire [31:0] ID_ALUSrcA;
 //---------------------------------
 
 parameter alu_add = 4'd2;
-wire [31:0] IF_JAddr, IF_BAddr;
+wire [31:0] ID_JAddr, ID_BAddr;
 reg wasj, wasbr;
 wire mis;
 assign mis = (wasbr ^ Branch) | (wasj ^ Jump);
 assign PCSrc = IF_Ctrl;
-assign IF_JAddr = {IF_PCP4[31:26], Instr[1][25:0], 2'b00};
+assign ID_JAddr = {IF_PCP4[31:26], Instr[1][25:0], 2'b00};
 
 ALU PCAdd(
     .alu_a(     PC),
@@ -86,35 +87,6 @@ InstMem myInstMem(
     .spo(       IF_Instr)//32
 );
 
-branchpre mybrp(
-    .clk(       clk),
-    .rst_n(     rst_n),
-    .Instr(     IF_Instr),
-    .istaken(   Branch || Jump),
-    .takebr(    takebr),
-    .takej(     takej)
-);
-
-always @(posedge clk, negedge rst_n)
-begin
-    if(~rst_n)
-    begin
-        wasj <= 0;
-        wasbr <= 0;
-    end
-    else
-    begin
-        wasj <= ~mis & takej;
-        wasbr <= ~mis & takebr;
-    end
-end
-
-ALU IF_BAddrCalc(
-    .alu_a(     $signed(IF_Instr[15:0])),
-    .alu_b(     IF_PCP4),
-    .alu_op(    4'd2),
-    .alu_out(   IF_BAddr)
-);
 
 //----------------------------------
 //DECODE
@@ -169,6 +141,8 @@ end
 control myControl(
     .opcode(    Opcode[1]),
     .funct(     Funct[1]),
+    .isbr(      takebr),
+    .isj(       takej),
     .wasbr(     wasbr),
     .wasj(      wasj),  
     .exc(       exc),
@@ -189,14 +163,6 @@ HDU myHDU(//Hazard Detection Unit
     .Stall(     ID_HDU_Stall) 
 );
 
-branch myBranch(
-    .Instr(     Instr[1]),
-    .R1(        ID_R1),
-    .R2(        ID_R2),
-    .Branch(    Branch),
-    .BLink(     BLink)
-);
-
 mux#(10) Dmux(
     .a(         Ctrl_out),//
     .b(         10'd0),
@@ -204,13 +170,6 @@ mux#(10) Dmux(
     .out(       Ctrl_out1)//
 );
 
-//Beware! Using PC in ID to calculate
-ALU BAddrCalc(
-    .alu_a(     SigImmShl),
-    .alu_b(     PCP4[1]),
-    .alu_op(    4'd2),
-    .alu_out(   BAddr)
-);
 
 reg_file myreg(
     .clk(       clk),
@@ -230,11 +189,7 @@ Ext SigExt(
     .out(       ID_SigImm)//32
 );
 
-Shl myShl2(
-    .in(        ID_SigImm),
-    .shamt(     32'd2),
-    .out(       SigImmShl)
-);
+
 
 //route PC+4 for jump(branch) and link
 mux ALUSrcAMux0(
@@ -243,6 +198,37 @@ mux ALUSrcAMux0(
     .b(         IF_PCP4),
     .sig(       Branch | Jump),
     .out(       ID_ALUSrcA)
+);
+
+
+branchpre mybrp(
+    .clk(       clk),
+    .rst_n(     rst_n),
+    .Instr(     IF_Instr),
+    .istaken(   Branch || Jump),
+    .takebr(    takebr),
+    .takej(     takej)
+);
+
+always @(posedge clk, negedge rst_n)
+begin
+    if(~rst_n)
+    begin
+        wasj <= 0;
+        wasbr <= 0;
+    end
+    else
+    begin
+        wasj <= ~mis & takej;
+        wasbr <= ~mis & takebr;
+    end
+end
+
+ALU ID_BAddrCalc(
+    .alu_a(     $signed(IF_Instr[15:0])),
+    .alu_b(     PCP4[1]),
+    .alu_op(    4'd2),
+    .alu_out(   ID_BAddr)
 );
 
 //------------------------------------------
@@ -255,6 +241,7 @@ wire EX_RegDst;
 wire [1:0] ForA, ForB;
 wire [31:0] ALUA, ALUB;
 reg [31:0] EX_SigImm;
+wire [31:0] pre_ALUOut;
 assign EX_RegDst = EX_RType;
 assign EX_JType = Opcode[2] == 6'd2 || Opcode[2] == 6'd3;
 assign EX_RType = !Opcode[2];
@@ -284,14 +271,35 @@ mux3#(5) EX_RegDstMux(
     .b(         Rd[2]),
     .c(         5'd31),
     //jal(J-Type) use $31 but jalr(R-Type) use $rd
-    .sig(       {!EX_RType & EX_Link, EX_RegDst}),
+    .sig(       {!EX_RType & Link, EX_RegDst}),
     .out(       EX_RegD)
 );
 
+Shl myShl2(
+    .in(        EX_SigImm),
+    .shamt(     32'd2),
+    .out(       SigImmShl)
+);
 
 EXHU myEXHU(//Exception Handling
     .rst_n(rst_n),
     .exc(exc)
+);
+
+branch myBranch(
+    .Instr(     Instr[2]),
+    .R1(        ALUA),
+    .R2(        ALUB),
+    .Branch(    Branch),
+    .BLink(     BLink)
+);
+
+//Beware! Using PC in ID to calculate
+ALU EX_BAddrCalc(
+    .alu_a(     SigImmShl),
+    .alu_b(     PCP4[2]),
+    .alu_op(    4'd2),
+    .alu_out(   BAddr)
 );
 
 mux3 ALUSrcAMux(
@@ -324,7 +332,14 @@ realALU mainALU(
     .opcode(    (EX_RType ? Instr[2][5:0] : Instr[2][31:26])),
     .shamt(     Instr[2][10:6]),
     .sig(       EX_RType),
-    .ALU_out(   EX_ALUOut)
+    .ALU_out(   pre_ALUOut)
+);
+
+mux aluReschange(
+    .a(         pre_ALUOut),
+    .b(         PCP4[2]),
+    .sig(       Link),
+    .out(       EX_ALUOut)
 );
 
 Forw myFU(//Forward Unit
@@ -343,6 +358,8 @@ Forw myFU(//Forward Unit
 //----------------------------------
 
 reg [31:0]MemOut[WB:WB];
+wire [7:0]switch;
+wire [31:0]getmem;
 DataMem myDataMem(
     .a(         ALUOut[3][11:2]),
     .d(         R2[3]),
@@ -350,6 +367,8 @@ DataMem myDataMem(
     .we(        MemWrite[3]),
     //MemRead should be read enable, not Memory enable, correspoding signal in control.v is suceptible to future change 
     //.ena(       MemRead[3]),
+    .dpra(      switch),
+    .dpo(       getmem),
     .spo(       M_MemOut)
 );
 
@@ -362,6 +381,18 @@ mux WBmux(
     .b(         MemOut[4]),
     .sig(       MemtoReg[4]),
     .out(       WB_MuxOut)
+);
+
+//------------------------------------
+//misc
+//------------------------------------
+
+lightseg mylight(
+    .clk(       clk),
+    .rst_n(     rst_n),
+    .getmem(    getmem),//31:0
+    .seg(      seg),//7:0
+    .an(       an)//3:0
 );
 
 //==================================================
@@ -390,17 +421,16 @@ begin
             PC <= (Branch | Jump)? BJAddr : PCP4[ID];
         else
         if(takebr)
-            PC <= IF_BAddr;
+            PC <= ID_BAddr;
         else
         if(takej)
-            PC <= IF_JAddr;
+            PC <= ID_JAddr;
         else
         begin
             if(~ID_HDU_Stall)
                 PC <= PCin;
         end
         PCP4[1] <= IF_PCP4;
-        EX_Link <= Link;
         ALUSrcA <= ID_ALUSrcA;
         EX_SigImm <= ID_SigImm;
         Ctrl_outEX <= Ctrl_out1[5:0];

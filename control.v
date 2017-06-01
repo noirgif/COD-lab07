@@ -4,6 +4,8 @@ module control(
     //exception, maybe turned into exception code one day
     input exc,
     input Branch,
+    input isbr,
+    input isj,
     input wasbr,
     input wasj,
     output reg[1:0] IF_Ctrl,//PCSrc[1:0]
@@ -38,8 +40,8 @@ parameter JTYPE = 2'h2;
 reg [1:0] optype;
 
 //TO-DO check JR flush
-assign IFFlush = (wasbr ^ Branch) || (!opcode && funct[5:1] == 4) || |exc;
-assign IDFlush = |exc;
+assign IFFlush = isbr || isj || (wasbr ^ Branch) || (!opcode && funct[5:1] == 4) || |exc;
+assign IDFlush = (wasbr ^ Branch) || (!opcode && funct[5:1] == 4) || |exc;
 assign EXFlush = |exc;
 
 always @*
