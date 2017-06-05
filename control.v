@@ -60,25 +60,17 @@ end
 
 always @*
 begin
+	case(optype)
+			RTYPE:
+			//JR and JALR taken into account
+					  IF_Ctrl = {1'b0, ID_Ctrl[1]};
+			ITYPE:
+						IF_Ctrl = {1'b0, Branch};
+			JTYPE:
+					  IF_Ctrl = 2'b01;
+    endcase
     if(exc)
         IF_Ctrl = 2'b10;
-    else
-    begin
-        case(optype)
-            RTYPE:
-            //JR and JALR taken into account
-                    IF_Ctrl = {1'b0, ID_Ctrl[1]};
-            ITYPE:
-            begin
-                if(Branch)
-                    IF_Ctrl = 2'b01;
-                else
-                    IF_Ctrl = 2'b00;
-            end
-            JTYPE:
-                    IF_Ctrl = 2'b01;
-        endcase
-    end
 end
 
 wire isJALR, isJR;

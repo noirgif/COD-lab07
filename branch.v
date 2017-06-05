@@ -40,6 +40,12 @@ begin
                     Branch = R1 < 0;
                     _BLink = Branch & link;
                 end
+					 default:
+					 begin
+						  Branch = 0;
+						  _BLink = 0;
+						  
+					 end
             endcase
         end
         BLEZ:

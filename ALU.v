@@ -27,6 +27,7 @@ begin
         'd1 : alu_out = a | b;
         'd2 : alu_out = a + b + CarryIn;
         'd3 : alu_out = a + b + CarryIn < 0;
+		  default: alu_out = 0;
     endcase
 end
 

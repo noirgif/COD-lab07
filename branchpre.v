@@ -32,7 +32,7 @@ assign rtype = !opcode;
 assign isbranch = (opcode == BZ) || (opcode == BEQ) || (opcode == BNE) || opcode == BLEZ || opcode == BGTZ;
 assign isJump =  opcode == JAL || opcode == J;
 
-always @(posedge clk, rst_n)
+always @(posedge clk, negedge rst_n)
 begin
     if(~rst_n)
     begin

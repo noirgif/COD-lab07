@@ -3,6 +3,7 @@
 module MIPS_TOP(
     input clk,
     input rst_n,
+	 input [7:0] sw,
     output [7:0] seg,
     output [3:0] an
 );
@@ -21,7 +22,7 @@ reg [31:0] PCP4[EX:ID];
 reg [31:0] ALUOut[WB:M];
 reg [31:0] Instr[EX:ID];
 wire [1:0]  IF_Ctrl;
-wire [1:0]  PCSrc;
+wire [1:0]  PCSrc; 
 wire [31:0] IF_PCP4;
 wire [31:0] IF_Instr;
 wire ID_ORout;
@@ -64,7 +65,7 @@ reg wasj, wasbr;
 wire mis;
 assign mis = (wasbr ^ Branch) | (wasj ^ Jump);
 assign PCSrc = IF_Ctrl;
-assign ID_JAddr = {IF_PCP4[31:26], Instr[1][25:0], 2'b00};
+assign ID_JAddr = {IF_PCP4[31:28], Instr[1][25:0], 2'b00};
 
 ALU PCAdd(
     .alu_a(     PC),
@@ -83,7 +84,7 @@ mux3 PCMux(
 
 //32bit-wide Mem
 InstMem myInstMem(
-    .a(      PC[11:2]),
+    .a(      PC[9:2]),
     .spo(       IF_Instr)//32
 );
 
@@ -105,7 +106,7 @@ assign Funct[1] = Instr[1][5:0];
 assign Funct[2] = Instr[2][5:0];
 assign JLink = ID_Ctrl[2];
 assign Link = BLink | JLink;
-assign JAddr = (Funct[1] == JR) ? ID_R1 : {PCP4[1][31:26], Instr[1][25:0], 2'b00};
+assign JAddr = (Funct[1] == JR) ? ID_R1 : {PCP4[1][31:28], Instr[1][25:0], 2'b00};
 assign Jump = ID_Ctrl[1];
 assign BJAddr = Branch ? BAddr : JAddr;
 
@@ -367,7 +368,7 @@ DataMem myDataMem(
     .we(        MemWrite[3]),
     //MemRead should be read enable, not Memory enable, correspoding signal in control.v is suceptible to future change 
     //.ena(       MemRead[3]),
-    .dpra(      switch),
+    .dpra(      {2'd0,sw}),
     .dpo(       getmem),
     .spo(       M_MemOut)
 );

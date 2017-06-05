@@ -59,6 +59,7 @@ begin
             SLT: ALU_out = $signed(ALU_a) < $signed(ALU_b);
             SLTU: ALU_out = $unsigned(ALU_a) < $signed(ALU_b);
             XOR: ALU_out = ALU_a ^ ALU_b;
+				default: ALU_out = 0;
         endcase
     end
     else
@@ -75,6 +76,7 @@ begin
             LW: ALU_out = ALU_a + ALU_b;
             XORI: ALU_out = ALU_a ^ {16'h0, ALU_b[15:0]};
             SW: ALU_out = ALU_a + ALU_b;
+				default: ALU_out = 0;
         endcase
     end
     if(overflow)

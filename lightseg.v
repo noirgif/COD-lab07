@@ -2,17 +2,19 @@ module lightseg(
     input clk,
     input rst_n,
     input [31:0] getmem,
-    output [7:0] seg,
-    output [3:0] an
+    output reg [7:0] seg,
+    output reg [3:0] an
 );
 
 wire [1:0]bit_disp;
 reg [3:0] disp_data;
 reg [32:0] clk_count;
+wire [4:0] place;
 wire word_disp;
+assign place = 16 * word_disp + 4 * bit_disp;
 
 assign bit_disp = clk_count[20:19];
-assign word_disp = clk_count[31];
+assign word_disp = clk_count[27];
 
 always@(posedge clk)
     clk_count <= clk_count + 1;
@@ -20,9 +22,10 @@ always@(posedge clk)
 always@(posedge clk)
 	an <= ~(1<<bit_disp);
 
+
 always @*
 begin
-    disp_data = get_mem[(16 * word_disp + 4 * bit_disp): (16 * word_disp + 4 * (bit_disp - 1))];
+    disp_data = getmem[place+:3];
 end
 
 always@(posedge clk)
