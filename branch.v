@@ -32,12 +32,12 @@ begin
             case(rt)
                 BGEZ:
                 begin
-                    Branch = R1 >= 0;
+                    Branch = ($signed(R1) >= $signed(0));
                     _BLink = Branch & link;
                 end
                 BLTZ:
                 begin
-                    Branch = R1 < 0;
+                    Branch = ($signed(R1) < $signed(0));
                     _BLink = Branch & link;
                 end
 					 default:
@@ -49,7 +49,7 @@ begin
             endcase
         end
         BLEZ:
-            Branch = R1 <= 0;
+            Branch = ($signed(R1) <= $signed(0));
         BGTZ:
             Branch = ($signed(R1) > $signed(0));
         BEQ:

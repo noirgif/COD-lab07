@@ -34,6 +34,7 @@ reg [4:0] Rs[EX:ID], Rt[EX:ID], Rd[EX:ID];
 wire [31:0] ID_R1, ID_R2;
 wire [2:0] ID_Ctrl;
 wire Link, JLink, BLink;
+reg EX_Link;
 
 wire Branch;
 reg Jump;
@@ -144,8 +145,11 @@ control myControl(
     .funct(     Funct[1]),
     .isbr(      takebr),
     .isj(       takej),
+    /*
     .wasbr(     wasbr),
-    .wasj(      wasj),  
+    .wasj(      wasj), 
+    */
+    .mis(       mis), 
     .exc(       exc),
     .Branch(    Branch),
     .IF_Ctrl(   IF_Ctrl),
@@ -197,7 +201,7 @@ mux ALUSrcAMux0(
     .a(         ID_R1),
     //delay slot
     .b(         IF_PCP4),
-    .sig(       Branch | Jump),
+    .sig(       1'b0),
     .out(       ID_ALUSrcA)
 );
 
@@ -247,7 +251,7 @@ assign EX_RegDst = EX_RType;
 assign EX_JType = Opcode[2] == 6'd2 || Opcode[2] == 6'd3;
 assign EX_RType = !Opcode[2];
 assign EX_IType = !EX_RType && !EX_JType;
-assign JAddr = (Funct[2] == JR) ? ALUA : {PCP4[2][31:28], Instr[2][25:0], 2'b00};
+assign JAddr = EX_RType ? ALUA : {PCP4[2][31:28], Instr[2][25:0], 2'b00};
 assign BJAddr = Branch ? BAddr : JAddr;
 
 
@@ -274,7 +278,7 @@ mux3#(5) EX_RegDstMux(
     .b(         Rd[2]),
     .c(         5'd31),
     //jal(J-Type) use $31 but jalr(R-Type) use $rd
-    .sig(       {!EX_RType & Link, EX_RegDst}),
+    .sig(       {EX_JType & EX_Link, EX_RegDst}),
     .out(       EX_RegD)
 );
 
@@ -341,7 +345,7 @@ realALU mainALU(
 mux aluReschange(
     .a(         pre_ALUOut),
     .b(         PCP4[2]),
-    .sig(       Link),
+    .sig(       EX_Link),
     .out(       EX_ALUOut)
 );
 
@@ -443,6 +447,7 @@ begin
         PCP4[2] <= PCP4[1];
         if(~IDFlush)
         begin
+            EX_Link <= Link;
             EX_SigImm <= ID_SigImm;
             Instr[2] <= Instr[1];
             Jump <= _Jump;
@@ -451,7 +456,8 @@ begin
             Ctrl_outWB[2] <= Ctrl_out1[9:8];
         end
         else
-        begin   
+        begin
+            EX_Link <= 0;   
             Ctrl_outEX <= 0;
             Ctrl_outM[2] <= 0;
             Ctrl_outWB[2] <= 0;

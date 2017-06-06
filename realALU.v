@@ -49,7 +49,7 @@ begin
             SRA: ALU_out = $signed(ALU_b) >>> shamt;
             SRLV: ALU_out = $unsigned(ALU_b) >> ALU_a;
             SLLV: ALU_out = ALU_b << ALU_a;
-            JALR: ALU_out = ALU_a;
+            JALR: ALU_out = ALU_b;
             ADD: begin ALU_out = ALU_b + ALU_a; overflow = (ALU_b[31] == ALU_a[31]) & (ALU_a[31] ^ ALU_out[31]);end
             ADDU: ALU_out = ALU_b + ALU_a;
             SUB: begin ALU_out = ALU_a - ALU_b; overflow = (ALU_b[31] ^ ALU_a[31]) & (ALU_a[31] ^ ALU_out[31]);end
@@ -65,7 +65,7 @@ begin
     else
     begin
         case(opcode)
-            JAL: ALU_out = ALU_a;
+            JAL: ALU_out = ALU_b;
             ADDI: begin ALU_out = ALU_a + ALU_b; overflow = (ALU_b[31] == ALU_a[31]) & (ALU_a[31] ^ ALU_out[31]); end
             ADDIU: ALU_out = ALU_a + ALU_b;
             SLTI: ALU_out = $signed(ALU_a) < $signed(ALU_b);

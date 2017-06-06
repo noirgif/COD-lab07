@@ -4,10 +4,14 @@ module control(
     //exception, maybe turned into exception code one day
     input exc,
     input Branch,
+    
     input isbr,
     input isj,
+    /*
     input wasbr,
     input wasj,
+    */
+    input mis,
     output reg[1:0] IF_Ctrl,//PCSrc[1:0]
     output reg[2:0] ID_Ctrl,//JLink:Jump:RegDst
 /** WB signal = MemtoReg:RegWrite
@@ -39,9 +43,9 @@ parameter ITYPE = 2'h1;
 parameter JTYPE = 2'h2;
 reg [1:0] optype;
 
-//TO-DO check JR flush
-assign IFFlush = isbr || isj || (wasbr ^ Branch) || (!opcode && funct[5:1] == 4) || |exc;
-assign IDFlush = (wasbr ^ Branch) || (!opcode && funct[5:1] == 4) || |exc;
+//TO-DO check JR flush???
+assign IFFlush = isbr || isj || mis ||  |exc;
+assign IDFlush = mis ||  |exc;
 assign EXFlush = |exc;
 
 always @*
