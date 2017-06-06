@@ -66,7 +66,7 @@ reg wasj, wasbr;
 wire mis;
 assign mis = (wasbr ^ Branch) | (wasj ^ Jump);
 assign PCSrc = IF_Ctrl;
-assign ID_JAddr = {IF_PCP4[31:28], Instr[1][25:0], 2'b00};
+
 
 ALU PCAdd(
     .alu_a(     PC),
@@ -107,9 +107,8 @@ assign Funct[1] = Instr[1][5:0];
 assign Funct[2] = Instr[2][5:0];
 assign JLink = ID_Ctrl[2];
 assign Link = BLink | JLink;
-assign JAddr = (Funct[2] == JR) ? ID_R1 : {PCP4[2][31:28], Instr[2][25:0], 2'b00};
+assign ID_JAddr = (!Opcode[1]) ? ID_R1 : {IF_PCP4[31:28], Instr[1][25:0], 2'b00};
 assign _Jump = ID_Ctrl[1];
-assign BJAddr = Branch ? BAddr : JAddr;
 
 integer i,j;
 always @*
@@ -248,6 +247,8 @@ assign EX_RegDst = EX_RType;
 assign EX_JType = Opcode[2] == 6'd2 || Opcode[2] == 6'd3;
 assign EX_RType = !Opcode[2];
 assign EX_IType = !EX_RType && !EX_JType;
+assign JAddr = (Funct[2] == JR) ? ALUA : {PCP4[2][31:28], Instr[2][25:0], 2'b00};
+assign BJAddr = Branch ? BAddr : JAddr;
 
 
 wire [1:0] EX_Ctrl_outWB1;
@@ -306,7 +307,7 @@ ALU EX_BAddrCalc(
 
 mux3 ALUSrcAMux(
     .a(         ALUSrcA),
-    .b(         M_MemOut),
+    .b(         WB_MuxOut),
     .c(         ALUOut[3]),
     .sig(       ForA),
     .out(       ALUA)//32
@@ -420,7 +421,7 @@ begin
             end
         end
         if(mis)
-            PC <= (Branch | Jump)? BJAddr : PCP4[ID];
+            PC <= (Branch | Jump)? BJAddr : PCP4[EX];
         else
         if(takebr)
             PC <= ID_BAddr;
@@ -440,14 +441,14 @@ begin
         Rs[2] <= Instr[1][25:21];
         Rt[2] <= Instr[1][20:16];
         PCP4[2] <= PCP4[1];
-        if(~EXFlush)
+        if(~IDFlush)
         begin
             EX_SigImm <= ID_SigImm;
             Instr[2] <= Instr[1];
             Jump <= _Jump;
-            Ctrl_outEX <= 0;
-            Ctrl_outM[2] <= 0;
-            Ctrl_outWB[2] <= 0;
+            Ctrl_outEX <= Ctrl_out1[5:0];
+            Ctrl_outM[2] <= Ctrl_out1[7:6];
+            Ctrl_outWB[2] <= Ctrl_out1[9:8];
         end
         else
         begin   

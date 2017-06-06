@@ -60,8 +60,8 @@ always @*
 begin
 	case(optype)
 			RTYPE:
-			//JR and JALR taken into account
-					  IF_Ctrl = {1'b0, ID_Ctrl[1]};
+			//JR and JALR should not be taken into account
+					  IF_Ctrl = {1'b0, 1'b0};
 			ITYPE:
 						IF_Ctrl = {1'b0, Branch};
 			JTYPE:
