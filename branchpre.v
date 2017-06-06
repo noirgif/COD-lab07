@@ -30,7 +30,7 @@ assign opcode = Instr[31:26];
 assign funct = Instr[5:0];
 assign rtype = !opcode;
 assign isbranch = (opcode == BZ) || (opcode == BEQ) || (opcode == BNE) || opcode == BLEZ || opcode == BGTZ;
-assign isJump =  opcode == JAL || opcode == J;
+assign isJump =  (opcode == JAL) || (opcode == J);
 
 always @(posedge clk, negedge rst_n)
 begin

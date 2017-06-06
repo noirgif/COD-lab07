@@ -35,7 +35,8 @@ wire [31:0] ID_R1, ID_R2;
 wire [2:0] ID_Ctrl;
 wire Link, JLink, BLink;
 
-wire Branch, Jump;
+wire Branch;
+reg Jump;
 
 reg MemRead[M:EX];
 reg MemWrite[M:EX];
@@ -106,8 +107,8 @@ assign Funct[1] = Instr[1][5:0];
 assign Funct[2] = Instr[2][5:0];
 assign JLink = ID_Ctrl[2];
 assign Link = BLink | JLink;
-assign JAddr = (Funct[1] == JR) ? ID_R1 : {PCP4[1][31:28], Instr[1][25:0], 2'b00};
-assign Jump = ID_Ctrl[1];
+assign JAddr = (Funct[2] == JR) ? ID_R1 : {PCP4[2][31:28], Instr[2][25:0], 2'b00};
+assign _Jump = ID_Ctrl[1];
 assign BJAddr = Branch ? BAddr : JAddr;
 
 integer i,j;
@@ -205,7 +206,7 @@ mux ALUSrcAMux0(
 branchpre mybrp(
     .clk(       clk),
     .rst_n(     rst_n),
-    .Instr(     IF_Instr),
+    .Instr(     Instr[1]),
     .istaken(   Branch || Jump),
     .takebr(    takebr),
     .takej(     takej)
@@ -433,17 +434,29 @@ begin
         end
         PCP4[1] <= IF_PCP4;
         ALUSrcA <= ID_ALUSrcA;
-        EX_SigImm <= ID_SigImm;
-        Ctrl_outEX <= Ctrl_out1[5:0];
-        Ctrl_outM[2] <= Ctrl_out1[7:6];
-        Ctrl_outWB[2] <= Ctrl_out1[9:8];
-        PCP4[2] <= PCP4[1];
-        Rs[2] <= Instr[1][25:21];
-        Rt[2] <= Instr[1][20:16];
-        Instr[2] <= Instr[1];
         R1[2] <= ID_R1;
         R2[2] <= ID_R2;
         Rd[2] <= Rd[1];
+        Rs[2] <= Instr[1][25:21];
+        Rt[2] <= Instr[1][20:16];
+        PCP4[2] <= PCP4[1];
+        if(~EXFlush)
+        begin
+            EX_SigImm <= ID_SigImm;
+            Instr[2] <= Instr[1];
+            Jump <= _Jump;
+            Ctrl_outEX <= 0;
+            Ctrl_outM[2] <= 0;
+            Ctrl_outWB[2] <= 0;
+        end
+        else
+        begin   
+            Ctrl_outEX <= 0;
+            Ctrl_outM[2] <= 0;
+            Ctrl_outWB[2] <= 0;
+            Instr[2] <= 0;
+            Jump <= 0;
+        end
         
         Ctrl_outM[3] <= EX_Ctrl_outM1;
         Ctrl_outWB[3] <= EX_Ctrl_outWB1;

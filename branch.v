@@ -51,7 +51,7 @@ begin
         BLEZ:
             Branch = R1 <= 0;
         BGTZ:
-            Branch = R1 > 0;
+            Branch = ($signed(R1) > $signed(0));
         BEQ:
             Branch = R1 == R2;
         BNE:

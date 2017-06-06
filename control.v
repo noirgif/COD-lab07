@@ -52,8 +52,6 @@ begin
         J: optype = JTYPE;
         JAL: optype = JTYPE;
         //catch exception(
-        6'bxxxxxx: optype = 2'bxx;
-        6'bzzzzzz: optype = 2'bzz;
         default: optype = ITYPE;
     endcase
 end
