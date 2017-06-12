@@ -1,3 +1,6 @@
+/*
+    3 to 1 multiplexer
+*/
 module mux3
 #(parameter WIDTH=32)
 (

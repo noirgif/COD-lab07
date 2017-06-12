@@ -1,3 +1,7 @@
+/*
+    Branch estimation
+    and Branch-and-link descrimination (not implemented here)
+*/
 module branch(
     input [31:0] Instr,
     input [31:0] R1,
@@ -5,7 +9,7 @@ module branch(
     output reg Branch,
     output reg BLink
 );
-
+//BGEZ and BLTZ have the same opcode
 parameter BZ = 6'b1;
     parameter BGEZ = 4'b1;
     parameter BLTZ = 4'b0;
@@ -16,8 +20,9 @@ parameter BLEZ = 6'b110;
 parameter BGTZ = 6'b111;
 
 wire [5:0] opcode;
-wire [3:0] rt;
 
+wire [3:0] rt;
+/* use a temporary variable to avoid repeating Blink every time */
 reg _BLink;
 
 assign opcode = Instr[31:26];

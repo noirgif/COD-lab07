@@ -1,4 +1,9 @@
 `timescale 1ns / 1ps
+/*
+    exception handle unit
+    
+    only overflow exception is handled
+*/
 
 module EXHU(
     input rst_n,

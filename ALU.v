@@ -1,3 +1,6 @@
+/*
+    Simple ALU, cannot handle complicated calculation
+*/
 module ALU(
     input [3:0] alu_op,
     input signed [31:0] alu_a,
@@ -7,7 +10,6 @@ module ALU(
     output Overflow,
     output Carry
 ); 
-
 
 wire Inv_a, Inv_b;
 wire [31:0] a;

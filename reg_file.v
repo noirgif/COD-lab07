@@ -1,3 +1,6 @@
+/*
+    register file using latch, though flip-flop is better
+*/
 module reg_file(
 	input	clk,
 	input	rst_n,

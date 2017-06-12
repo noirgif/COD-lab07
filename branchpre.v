@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
-
+/*
+    Branch prediction module
+*/
 module branchpre(
     input clk,
     input rst_n,
@@ -30,6 +32,7 @@ assign opcode = Instr[31:26];
 assign funct = Instr[5:0];
 assign rtype = !opcode;
 assign isbranch = (opcode == BZ) || (opcode == BEQ) || (opcode == BNE) || opcode == BLEZ || opcode == BGTZ;
+//Do not predict JR jump since the destination address is subject to future change
 assign isJump =  (opcode == JAL) || (opcode == J);
 
 always @(posedge clk, negedge rst_n)

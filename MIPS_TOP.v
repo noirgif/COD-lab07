@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
-
+/*
+    Top module
+    The registers are here to reduce wiring
+*/
 module MIPS_TOP(
     input clk,
     input rst_n,

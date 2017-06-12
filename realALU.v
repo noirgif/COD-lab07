@@ -1,3 +1,6 @@
+/*
+    the main ALU for the CPU
+*/
 module realALU(
     input [5:0] opcode,
     input sig,

@@ -1,7 +1,7 @@
 module control(
     input [5:0] opcode,
     input [5:0] funct,
-    //exception, maybe turned into exception code one day
+    //exception code, nonzero if there's an exception
     input [1:0] exc,
     input Branch,
     
@@ -16,7 +16,7 @@ module control(
     output reg[2:0] ID_Ctrl,//JLink:Jump:RegDst
 /** WB signal = MemtoReg:RegWrite
  *  M  signal = MemRead:MemWrite
- *  EX signal = ALUop(Opcode or Funct)
+ *  EX signal = ALUop(Opcode or Funct) (Not used)
  */
     output reg [9:0] Ctrl_out,//pack of WB:M:EX control signal
     output IFFlush,
@@ -43,7 +43,6 @@ parameter ITYPE = 2'h1;
 parameter JTYPE = 2'h2;
 reg [1:0] optype;
 
-//TO-DO check JR flush???
 assign IFFlush = isbr || isj || mis ||  |exc;
 assign IDFlush = mis ||  |exc;
 assign EXFlush = |exc;
@@ -55,7 +54,7 @@ begin
             optype = RTYPE;
         J: optype = JTYPE;
         JAL: optype = JTYPE;
-        //catch exception(
+        //catch anomaly where opcode is NaN(not implemented)
         default: optype = ITYPE;
     endcase
 end
@@ -65,11 +64,11 @@ begin
 	case(optype)
 			RTYPE:
 			//JR and JALR should not be taken into account
-					  IF_Ctrl = {1'b0, 1'b0};
+					IF_Ctrl = {1'b0, 1'b0};
 			ITYPE:
-						IF_Ctrl = {1'b0, Branch};
+					IF_Ctrl = {1'b0, Branch};
 			JTYPE:
-					  IF_Ctrl = 2'b01;
+					IF_Ctrl = 2'b01;
     endcase
     if(exc)
         IF_Ctrl = 2'b10;
@@ -91,6 +90,9 @@ begin
     endcase
 end
 
+/*
+    isWR indicates if a I-type instruction do write registers
+*/
 wire isLW, isSW, isWR;
 assign isLW = opcode == LW;
 assign isSW = opcode == SW;

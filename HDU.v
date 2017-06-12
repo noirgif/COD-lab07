@@ -1,3 +1,7 @@
+/*
+    Hazard detection unit
+    Stall when the operand is being read from memory
+*/
 module HDU(
     input EX_MemRead,
     input [4:0] EX_RegD,
