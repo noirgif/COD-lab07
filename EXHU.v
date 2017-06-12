@@ -2,8 +2,16 @@
 
 module EXHU(
     input rst_n,
-    output exc
+    input Overflow,
+    output reg [1:0] exc
     );
-    
-assign exc = ~rst_n;
+
+always @*
+begin
+    if(rst_n)
+        exc = 0;
+    else
+        if(Overflow)
+            exc = 2'b01;
+end
 endmodule

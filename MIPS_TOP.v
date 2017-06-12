@@ -26,6 +26,7 @@ wire [1:0]  PCSrc;
 wire [31:0] IF_PCP4;
 wire [31:0] IF_Instr;
 wire ID_ORout;
+wire [1:0] exc;
 
 wire [31:0] BAddr, JAddr;
 wire [5:0] Opcode[EX:ID], Funct[EX:ID];
@@ -48,7 +49,7 @@ reg MemtoReg[WB:EX];
 reg [1:0]Ctrl_outWB[WB:EX];
 reg [31:0]R1[EX:EX];
 reg [31:0]R2[M:EX];
-wire exc, IFFlush, IDFlush, EXFlush;
+wire IFFlush, IDFlush, EXFlush;
 wire [9:0] Ctrl_out;
 wire [9:0] Ctrl_out1;
 wire [4:0] EX_RegD;
@@ -290,6 +291,7 @@ Shl myShl2(
 
 EXHU myEXHU(//Exception Handling
     .rst_n(rst_n),
+    .Overflow(Overflow),
     .exc(exc)
 );
 
@@ -339,6 +341,7 @@ realALU mainALU(
     .opcode(    (EX_RType ? Instr[2][5:0] : Instr[2][31:26])),
     .shamt(     Instr[2][10:6]),
     .sig(       EX_RType),
+    .Overflow(  Overflow),
     .ALU_out(   pre_ALUOut)
 );
 

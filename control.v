@@ -2,7 +2,7 @@ module control(
     input [5:0] opcode,
     input [5:0] funct,
     //exception, maybe turned into exception code one day
-    input exc,
+    input [1:0] exc,
     input Branch,
     
     input isbr,
