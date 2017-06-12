@@ -1,11 +1,13 @@
 文件列表：
 * 计算ALU.v 
 * 判断是否分支 branch.v 
+* 分支预测 branchpre.v
 * 控制信号（除了分支信号） control.v 
 * 异常处理 EXHU.v 
 * 位拓展 Ext.v 
 * 转发控制 Forw.v 
 * Hazard检测 HDU.v 
+* 烧写至开发板上，用开关显示指示地址 lightseg.v
 * 顶层模块 MIPS_TOP.v 
 * 3选1 mux3.v 
 * 2选1 mux.v 
